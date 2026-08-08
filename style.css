@@ -1,0 +1,482 @@
+/* ==========================================================================
+   Crime indicators, Community of Madrid
+   Plain CSS, no framework. Everything the page needs is in this file.
+
+   The palette is defined once as custom properties so that the map, the
+   legend and the charts stay in step. The map classes are the five blues; the
+   "no data" grey sits deliberately outside that ramp, so that a municipality
+   without published data can never be mistaken for a low value.
+   ========================================================================== */
+
+:root {
+  --c1: #eef3f8;
+  --c2: #c3d4e6;
+  --c3: #8fb0d3;
+  --c4: #5a86ba;
+  --c5: #2c5c96;
+
+  --no-data: #d9d9d9;
+  --accent:  #b03a2e;
+
+  --ink:       #1c2733;
+  --ink-soft:  #5b6b7c;
+  --line:      #d8dee6;
+  --panel:     #ffffff;
+  --page:      #f4f6f9;
+  --map-back:  #f7f9fb;   /* the map has no basemap, this is its background */
+
+  --radius: 8px;
+  --gap: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+
+button:hover { border-color: var(--c4); color: var(--c5); }
+
+button.primary {
+  background: var(--c5);
+  border-color: var(--c5);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.primary:hover { background: #24507f; color: #fff; }
+
+/* A button that is on or off, and looks it. Used for the weighted view of
+   module A, where the choice is not one of a list but a mode. */
+button.toggle { padding: 6px 14px; font-size: 14px; }
+
+button.toggle.on {
+  background: var(--c5);
+  border-color: var(--c5);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.toggle.on:hover { background: #24507f; border-color: #24507f; color: #fff; }
+
+/* --------------------------------------------------------------------------
+   Header and tabs
+   -------------------------------------------------------------------------- */
+
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 24px 0 24px;
+}
+
+header h1 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+
+.subtitle { margin: 2px 0 14px 0; color: var(--ink-soft); font-size: 13.5px; max-width: 80ch; }
+
+#tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+
+#tabs button {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 9px 14px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  border-radius: 4px 4px 0 0;
+}
+
+#tabs button:hover { background: var(--page); color: var(--ink); }
+
+#tabs button.active {
+  color: var(--c5);
+  border-bottom-color: var(--c5);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Module description
+   -------------------------------------------------------------------------- */
+
+#module-intro {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 24px 14px 24px;
+}
+
+#module-intro h2 { margin: 0 0 6px 0; font-size: 17px; font-weight: 650; }
+#intro-lead { margin: 0 0 8px 0; max-width: 90ch; }
+
+#intro-points {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+  max-width: 90ch;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+#intro-points li { margin-bottom: 3px; }
+
+/* The line that changes with the current selection, so that a reader always
+   knows in words what the number on the map means. */
+#intro-points li.current {
+  margin-top: 8px;
+  padding: 7px 11px;
+  background: #eef3f8;
+  border-left: 3px solid var(--c4);
+  border-radius: 0 5px 5px 0;
+  list-style: none;
+  margin-left: -20px;
+  color: var(--ink);
+  width: max-content;
+  max-width: 100%;
+}
+#intro-points strong { color: var(--ink); }
+
+#intro-formula summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--c5);
+  font-weight: 600;
+  width: max-content;
+}
+
+#intro-formula-body {
+  margin-top: 8px;
+  max-width: 90ch;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.formula {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--page);
+  border-left: 3px solid var(--c3);
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+.formula .where { display: block; margin-top: 4px; color: var(--ink-soft); font-size: 12.5px; }
+
+/* --------------------------------------------------------------------------
+   Controls
+   -------------------------------------------------------------------------- */
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--gap);
+  padding: 14px 24px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.module-controls { display: contents; }
+
+/* display:contents beats the browser default for [hidden], so the hidden
+   state has to be restated here or every module's controls stay visible. */
+.module-controls[hidden] { display: none; }
+
+.control { display: flex; flex-direction: column; gap: 4px; }
+.control[hidden] { display: none; }
+
+.control label {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.control select {
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 10px;
+  min-width: 180px;
+  max-width: 340px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.control select:focus { outline: 2px solid var(--c4); outline-offset: 1px; }
+.control select:disabled { background: var(--page); color: var(--ink-soft); }
+
+/* --------------------------------------------------------------------------
+   Weight editor. It lives inside the right hand panel, beside the map, so it
+   is styled as panel content rather than as a band of its own.
+   -------------------------------------------------------------------------- */
+
+#weight-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 7px 14px;
+  margin: 10px 0 14px 0;
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.weight-row .swatch-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  display: inline-block; margin-right: 7px; flex: none;
+}
+
+.weight-row .name { flex: 1; }
+
+.weight-row input {
+  width: 68px;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  text-align: right;
+}
+
+.weights-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.preset-label { font-size: 12.5px; color: var(--ink-soft); width: 100%; margin-top: 4px; }
+button.preset { font-size: 13px; padding: 5px 10px; }
+
+/* --------------------------------------------------------------------------
+   The prompt shown where a chart would be when nothing is selected yet
+   -------------------------------------------------------------------------- */
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+  color: var(--ink-soft);
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 14px;
+  margin: 0;
+}
+
+.empty-state span { display: block; margin-top: 6px; font-size: 12.5px; }
+
+/* --------------------------------------------------------------------------
+   Layout
+   -------------------------------------------------------------------------- */
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gap);
+  padding: var(--gap) 24px 24px 24px;
+  align-items: start;
+}
+
+main > section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px 16px 18px;
+}
+
+#panel-wide, #panel-table, #methodology { grid-column: 1 / -1; }
+
+/* Module C has no map and two charts that both need the full width, so its
+   panels stack in a single column instead of sitting side by side. */
+main.stacked { grid-template-columns: minmax(0, 1fr); }
+
+main.methodology { grid-template-columns: minmax(0, 1fr); }
+main.methodology #panel-left,
+main.methodology #panel-right,
+main.methodology #panel-wide,
+main.methodology #panel-table { display: none; }
+
+main h2 { margin: 0 0 12px 0; font-size: 16px; font-weight: 650; }
+main h3 { margin: 0 0 10px 0; font-size: 14.5px; font-weight: 650; }
+
+/* Panel heading with a button on the right, used for the map and its
+   clear selection button. */
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.panel-head h3 { margin: 0; }
+
+#clear-selection {
+  font-size: 12.5px;
+  padding: 4px 10px;
+  color: var(--accent);
+  border-color: #e6c7c2;
+  white-space: nowrap;
+}
+
+#clear-selection:hover { border-color: var(--accent); color: var(--accent); background: #fdf3f1; }
+#methodology h3 { margin: 22px 0 6px 0; }
+
+/* --------------------------------------------------------------------------
+   Map. There is no tile layer: the only thing drawn is the boundary file.
+   -------------------------------------------------------------------------- */
+
+#map {
+  height: 500px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--map-back);
+}
+
+.leaflet-container { background: var(--map-back); }
+
+#map-missing {
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 24px;
+  color: var(--ink-soft);
+  background: #fbfcfd;
+}
+
+#map-missing code {
+  background: var(--page); padding: 1px 5px; border-radius: 4px; font-size: 12.5px;
+}
+
+.leaflet-tooltip.mun-tooltip { font-size: 12.5px; line-height: 1.4; }
+
+#legend { margin-top: 12px; font-size: 12.5px; color: var(--ink-soft); }
+#legend .legend-title { font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+#legend .legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+#legend .swatch { display: inline-flex; align-items: center; gap: 6px; }
+
+#legend .swatch i {
+  width: 22px; height: 12px; display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.18); border-radius: 2px;
+}
+
+#legend .hint { margin-top: 6px; font-size: 12px; }
+
+/* --------------------------------------------------------------------------
+   Charts
+   -------------------------------------------------------------------------- */
+
+.chart-box { position: relative; height: 320px; }
+#wide-box { height: 900px; }   /* overwritten per chart so every label fits */
+
+.note, .small { font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 0 0; }
+.note strong { color: var(--ink); }
+
+/* Inline colour key, used where a chart encodes a category by colour and a
+   separate legend box would take more room than the key itself. */
+.note .key { white-space: nowrap; }
+
+.note .key i {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border-radius: 2px;
+  margin: 0 4px 0 10px;
+  vertical-align: -1px;
+}
+
+.note .key i:first-child { margin-left: 0; }
+
+/* --------------------------------------------------------------------------
+   Data table
+   -------------------------------------------------------------------------- */
+
+.table-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+
+.table-head h3 { margin: 0; }
+
+.table-scroll { max-height: 620px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+
+#data-table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+
+#data-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--page);
+  border-bottom: 2px solid var(--ink-soft);
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+#data-table th:hover { color: var(--c5); }
+#data-table th .arrow { color: var(--c5); font-size: 11px; margin-left: 4px; }
+#data-table td { border-bottom: 1px solid var(--line); padding: 6px 12px; white-space: nowrap; }
+#data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+#data-table tr:hover td { background: #f8fafc; }
+#data-table tr.selected td { background: #fdeeec; }
+#data-table tbody tr { cursor: pointer; }
+
+/* --------------------------------------------------------------------------
+   Methodology tables and prose
+   -------------------------------------------------------------------------- */
+
+table.plain { border-collapse: collapse; font-size: 13.5px; margin: 8px 0 4px 0; }
+table.plain th, table.plain td { border-bottom: 1px solid var(--line); padding: 6px 14px 6px 0; text-align: left; }
+table.plain th { font-weight: 600; border-bottom: 2px solid var(--ink-soft); white-space: nowrap; }
+
+#methodology p, #methodology li { max-width: 82ch; }
+#methodology ul { padding-left: 20px; }
+#methodology li { margin-bottom: 6px; }
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+
+footer { padding: 0 24px 28px 24px; color: var(--ink-soft); font-size: 13px; }
+#coverage-note { margin: 0 0 6px 0; font-weight: 600; color: var(--ink); }
+
+/* --------------------------------------------------------------------------
+   Loading and error banner
+   -------------------------------------------------------------------------- */
+
+#banner {
+  padding: 10px 24px;
+  font-size: 13.5px;
+  background: #fff6e5;
+  border-bottom: 1px solid #f0dcb4;
+  color: #7a5b16;
+}
+
+#banner.error { background: #fdecea; border-bottom-color: #f5c6c0; color: #8a2a1c; }
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 980px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+  #map { height: 380px; }
+  .control select { min-width: 150px; }
+}
