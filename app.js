@@ -3,6 +3,16 @@
 // 1. Constants
 
 const PALETTE = ['#eef3f8', '#c3d4e6', '#8fb0d3', '#5a86ba', '#2c5c96'];
+const CRIME_COLOUR = {
+  BURGLARY:         '#E69F00',
+  VEHICLE_THEFT:    '#0072B2',
+  INJURY:           '#009E73',
+  THEFT:            '#56B4E9',
+  ROBBERY_VIOLENT:  '#D55E00',
+  SEXUAL:           '#CC79A7',
+  DRUG_TRAFFICKING: '#6A51A3',
+  OTHER:            '#7F6A55' 
+};
 const NO_DATA = '#d9d9d9';
 const ACCENT  = '#b03a2e';
 const PINK    = '#c2708a';
@@ -13,6 +23,7 @@ const AGE_ORDER = ['0-13', '14-17', '18-30', '31-40', '41-64', '65+', 'U'];
 const AGE_LABEL = { U: 'unknown age' };
 const SEX_LABEL = { M: 'Male', F: 'Female', U: 'Unknown' };
 const COMPARABLE_BANDS = ['14-17', '18-30', '31-40', '41-64', '65+'];
+const MIN_OFFENCES = 20;
 
 const A_INDICATORS = {
   per1000: { field: 'rate_per_1000', denominator: 'population', scale: 1000,
@@ -49,7 +60,10 @@ const D_INDICATORS = {
   shannon: {label: 'Variety of offences, Shannon entropy', unit: 'nats',
     plain: 'Measures how diverse the offence mix is. Higher values mean the offences are distributed across more types rather than concentrated in a few.'},
   unclassified_share: {label: 'Share that cannot be classified', unit: 'share of all offences',
-    plain: 'The fraction of offences that fall in the residual category.'}
+    plain: 'The fraction of offences that fall in the residual category.'},
+  specialisation: { label: 'Offence the municipality stands out in',
+    unit: 'location quotient',
+    plain: 'The offence type that takes a larger share of this municipality\'s offence mix than it takes across every published municipality.' }
 };
 
 const PRESETS = {
@@ -187,10 +201,11 @@ function colourOf(value, cuts) {
   return PALETTE[i];
 }
 
-function drawChoropleth(values, unit, title) {
+function drawChoropleth(values, unit, title, extra = {}) {
   if (!boundaries || !map) return;
 
-  const cuts = quantileBreaks(Object.values(values));
+  const categorical = Boolean(extra.colour);
+  const cuts = categorical ? [] : quantileBreaks(Object.values(values));
   if (geoLayer) map.removeLayer(geoLayer);
 
   geoLayer = L.geoJSON(boundaries, {
@@ -199,7 +214,7 @@ function drawChoropleth(values, unit, title) {
       const hasData = value !== null && value !== undefined;
       const chosen = properties.ine_code === state.selected;
       return {
-        fillColor: colourOf(value, cuts),
+        fillColor: categorical ? (extra.colour[properties.ine_code] || NO_DATA) : colourOf(value, cuts),
         fillOpacity: hasData ? 0.92 : 0.5,
         color: chosen ? ACCENT : (hasData ? '#8d99a6' : '#b9c1c9'),
         weight: chosen ? 3 : 0.6,
@@ -211,14 +226,17 @@ function drawChoropleth(values, unit, title) {
       const shown = (value === null || value === undefined)
         ? '<em>not published by the Ministry of the Interior</em>'
         : `<strong>${fmt(value)}</strong> ${unit}`;
-      layer.bindTooltip(`<strong>${nameOf(properties.ine_code)}</strong><br>${shown}`, { className: 'mun-tooltip', sticky: true });
+      const more = extra.line && extra.line[properties.ine_code]
+        ? `<br>${extra.line[properties.ine_code]}` : '';
+      layer.bindTooltip(`<strong>${nameOf(properties.ine_code)}</strong><br>${shown}${more}`, { className: 'mun-tooltip', sticky: true });
       layer.on('click', () => select(properties.ine_code));
     }
   }).addTo(map);
 
   if (!map._fitted) { map.fitBounds(geoLayer.getBounds(), { padding: [8, 8] }); map._fitted = true; }
 
-  drawLegend(cuts, unit, title);
+  if (categorical) drawKeyLegend(extra.key, title);
+  else drawLegend(cuts, unit, title);
 }
 
 function drawLegend(cuts, unit, title) {
@@ -236,6 +254,15 @@ function drawLegend(cuts, unit, title) {
   });
   ranges.push(swatch(NO_DATA, 'not published'));
   setHtml('legend', `<div class="legend-title">${title}${unit ? `, ${unit}` : ''}</div>` + `<div class="legend-row">${ranges.join('')}</div>`);
+}
+
+function drawKeyLegend(items, title) {
+  const swatch = (colour, label) => `<span class="swatch"><i style="background:${colour}"></i>${label}</span>`;
+
+  const entries = items.map(i => swatch(i.colour, i.label));
+  entries.push(swatch(NO_DATA, 'not published'));
+
+  setHtml('legend', `<div class="legend-title">${title}</div>` + `<div class="legend-row">${entries.join('')}</div>`);
 }
 
 
@@ -744,7 +771,25 @@ function offenceMix(year, ineCode) {
   })), m => m.share);
 }
 
+function specialisation(year) {
+  const best = {};
+  data.crime_specialisation.forEach(r => {
+    if (r.year !== year || r.location_quotient === null) return;
+    if (r.offences < MIN_OFFENCES) return;
+    const current = best[r.ine_code];
+    if (!current || r.location_quotient > current.lq) {
+      best[r.ine_code] = {
+        ine_code: r.ine_code, code: r.crime_code,
+        crime: meta.crimeMun[r.crime_code] || r.crime_code,
+        lq: r.location_quotient, offences: r.offences, share: r.local_share
+      };
+    }
+  });
+  return Object.values(best);
+}
+
 function drawD() {
+  if (state.d.indicator === 'specialisation') { drawSpecialisation(); return; }
   const indicator = D_INDICATORS[state.d.indicator];
   const rows = data.crime_structure.filter(r => r.year === state.year);
 
@@ -794,6 +839,61 @@ function drawD() {
     filename: `crime_structure_${state.year}.csv`,
     note: 'Violent, non violent and cannot be classified add up to the offence count. The violent ' +
           'share is computed over the first two only.'
+  });
+}
+
+function drawSpecialisation() {
+  const rows = specialisation(state.year);
+  const tally = desc(Object.values(rows.reduce((acc, r) => {
+    (acc[r.code] || (acc[r.code] = { code: r.code, crime: r.crime, n: 0 })).n += 1;
+    return acc;
+  }, {})), t => t.n);
+  const crimeColour = (code) => CRIME_COLOUR[code] || GREY;
+  const keyItems = tally.map(t => ({ label: t.crime, colour: crimeColour(t.code) }));
+  const key = tally.map(t => `<i style="background:${crimeColour(t.code)}"></i>${t.crime}`).join('');
+
+  setText('left-title', `Offence each municipality stands out in, ${state.year}`);
+  drawChoropleth(byCode(rows, r => r.lq), 'location quotient', `Offence each municipality stands out in, ${state.year}`, {
+    colour: byCode(rows, r => crimeColour(r.code)),
+    line: byCode(rows, r => `stands out in <strong>${r.crime.toLowerCase()}</strong>`),
+    key: keyItems
+  });
+  setText('left-note', D_INDICATORS.specialisation.plain);
+
+  setText('wide-title', `Every municipality with published data, ${state.year}`);
+  rankedBar('chart-wide', 'wide-box', desc(rows, r => r.lq), {
+    label: r => nameOf(r.ine_code),
+    unit: 'location quotient',
+    series: [{ value: r => r.lq, colour: r => crimeColour(r.code) }],
+    onPick: r => select(r.ine_code),
+    tip: r => `${r.crime}: ${fmt(r.share * 100, 1)} % of the local mix, ` +
+              `${fmt(r.lq, 2)} times the reference share`
+  });
+  setHtml('wide-note', 'Each bar is coloured by the offence type that municipality stands out in. Click a bar to load that municipality into the chart beside the map.');
+
+  showRight('chart');
+  setText('right-title', `Offence types municipalities stand out in, ${state.year}`);
+  rankedBar('chart-right', 'right-chart-box', tally, {
+    label: t => t.crime, unit: 'municipalities', perBar: 26,
+    series: [{ value: t => t.n, colour: t => crimeColour(t.code) }],
+    tip: t => `${t.n} municipalities stand out in ${t.crime.toLowerCase()}`
+  });
+  setHtml('right-note',
+    `Only offence types with at least ${MIN_OFFENCES} recorded offences in the municipality ` +
+    'are eligible, so a single incident cannot make a municipality stand out.');
+
+  setTable([
+    col('name', 'Municipality'), col('ine_code', 'INE code'),
+    col('crime', 'Stands out in'),
+    col('lq', 'Location quotient', 'dec2'),
+    col('share', 'Share of the local mix', 'pct1'),
+    col('offences', 'Recorded offences', 'int')
+  ], rows.map(r => Object.assign({ name: nameOf(r.ine_code) }, r)), {
+    title: `Specialisation, ${state.year}, all the numbers`,
+    sortKey: 'lq', rowKey: 'ine_code',
+    filename: `specialisation_${state.year}.csv`,
+    note: 'The location quotient is the share the offence type takes of the local offence mix ' +
+          'divided by the share it takes across every published municipality that year.'
   });
 }
 
@@ -948,7 +1048,8 @@ const MODULES = {
     points: [
       '<strong>Violent share</strong> shows the proportion of offences classified as violent.',
       '<strong>Variety of offences</strong> measures how evenly offences are distributed across different types. Low values mean that a few types dominate, while high values mean that offences are more evenly distributed. The normalised version ranges from <strong>0 to 1</strong>.',
-      '<strong>Unclassified share</strong> shows the proportion of offences that cannot be classified as either violent or non-violent. The violent share is calculated only from the offences that can be classified.'
+      '<strong>Unclassified share</strong> shows the proportion of offences that cannot be classified as either violent or non-violent. The violent share is calculated only from the offences that can be classified.',
+      `<strong>Offence the municipality stands out in</strong> is the offence that has a higher share in the municipality than in other municipalities.`
     ],
     formula: `
       <div class="formula">
@@ -976,6 +1077,17 @@ const MODULES = {
         Normalised Shannon Entropy = Shannon Entropy / Maximum Entropy
         <span class="where">
           The same measure scaled from 0 to 1, making it easier to compare municipalities.
+        </span>
+      </div>
+
+      <div class="formula">
+        Location Quotient = (c<sub>i,k</sub> / c<sub>i</sub>) &divide; (c<sub>k</sub> / c)
+        <span class="where">
+          c<sub>i,k</sub> = offences of type k in municipality i;<br>
+          c<sub>i</sub> = all offences in municipality i;<br>
+          c<sub>k</sub> = offences of type k across all published municipalities;<br>
+          c = all offences across all published municipalities.<br>
+          Compares the share of an offence type in a municipality with its share across all municipalities.
         </span>
       </div>
     `
@@ -1185,7 +1297,7 @@ async function start() {
     NAMES = Object.fromEntries(meta.municipalities.map(m => [m.ine_code, titleCase(m.name)]));
     AREA = Object.fromEntries(meta.municipalities.map(m => [m.ine_code, m.surface_km2]));
 
-    const names = ['crime_level', 'police_performance', 'demographic_profile', 'crime_structure'];
+    const names = ['crime_level', 'police_performance', 'demographic_profile', 'crime_structure', , 'crime_specialisation'];
     const tables = await Promise.all(names.map(loadTable));
     names.forEach((name, i) => { data[name] = tables[i]; });
     normalise();
