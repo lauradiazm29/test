@@ -128,6 +128,7 @@
         <option value="shannon_normalised">Variety of offences, normalised</option>
         <option value="shannon">Variety of offences, Shannon entropy</option>
         <option value="unclassified_share">Share that cannot be classified</option>
+        <option value="specialisation">Offence the municipality stands out in</option>
       </select>
     </div>
   </div>
@@ -225,17 +226,30 @@
 
     <h3>Sources and attribution</h3>
     <ul>
-      <li>Crime data: 
-        <a href="https://estadisticasdecriminalidad.ses.mir.es/publico/portalestadistico/" target="_blank" rel="noopener noreferrer"> 
-          Ministerio del Interior, Portal Estadístico de Criminalidad </a> </li> 
-      <li>Population: 
-        <a href="https://www.ine.es/" target="_blank" rel="noopener noreferrer"> 
-          Instituto Nacional de Estadística </a> </li>    
-      <li>Municipal boundaries: derived from
+      <li>Crime data:
+        <a href="https://estadisticasdecriminalidad.ses.mir.es/publico/portalestadistico/"
+           target="_blank" rel="noopener noreferrer">
+          Ministerio del Interior, Portal Estadístico de Criminalidad</a>.</li>
+
+      <li>Population:
+        <a href="https://www.ine.es/" target="_blank" rel="noopener noreferrer">
+          Instituto Nacional de Estadística</a>. Elaboración propia con datos
+        extraídos del sitio web del INE.</li>
+
+      <li>Municipal surface areas, used as the denominator of the offences per
+        km&sup2; indicator:
+        <a href="https://www.ign.es/web/rcc-nomenclator-nacional"
+           target="_blank" rel="noopener noreferrer">
+          Nomenclátor Geográfico de Municipios y Entidades de Población</a>,
+        CC BY 4.0 ign.es. Areas are published in hectares and converted to
+        square kilometres.</li>
+
+      <li>Municipal boundaries: obra derivada de
         <a href="https://idem.comunidad.madrid/catalogocartografia/srv/spa/catalog.search#/metadata/spacm_divisionesadmin"
-          target="_blank" rel="noopener noreferrer">
-          “Líneas Límite Municipales”</a>,
-        IDEM Comunidad de Madrid, licensed under CC BY 4.0.</li>
+           target="_blank" rel="noopener noreferrer">
+          Líneas Límite Municipales</a>,
+        IDEM Comunidad de Madrid, CC BY 4.0. Reprojected from ETRS89 UTM zone
+        30N to WGS 84 and dissolved to one polygon per municipality.</li>
     </ul>
   </section>
 
@@ -244,7 +258,8 @@
 <footer>
   <p id="coverage-note"></p>
   <p class="small">Bachelor's thesis in Applied Mathematics and Computing.
-     Data: Ministerio del Interior and INE. Boundaries: IGN, CC BY 4.0.
+     Data: Ministerio del Interior, INE, IGN and IDEM Comunidad de Madrid.
+     Geographic data CC BY 4.0. Full attribution under Methodology.
      Built with Leaflet and Chart.js.</p>
 </footer>
 
